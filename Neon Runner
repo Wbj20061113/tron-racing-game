@@ -1,0 +1,198 @@
+import pygame
+import random
+import sys
+
+# --- 1. 初始化与基础设置 ---
+pygame.init()
+
+WIDTH, HEIGHT = 800, 400
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Neon Runner | 霓虹跑酷")
+
+# 霓虹配色方案
+BG_COLOR = (10, 10, 15)         # 深空黑背景
+NEON_BLUE = (0, 243, 255)       # 玩家霓虹蓝
+NEON_PINK = (255, 0, 255)       # 障碍物霓虹粉
+NEON_GREEN = (0, 255, 128)      # 地面霓虹绿
+STAR_COLOR = (255, 255, 255)    # 星星颜色
+
+clock = pygame.time.Clock()
+FPS = 60
+
+# --- 2. 游戏类与变量 ---
+
+# 玩家类
+class Player:
+    def __init__(self):
+        self.width = 30
+        self.height = 30
+        self.x = 100
+        self.y = HEIGHT - 80
+        self.velocity = 0
+        self.gravity = 0.8
+        self.jump_power = -13
+        self.is_jumping = False
+        self.trail = [] # 记录拖尾粒子
+
+    def jump(self):
+        if not self.is_jumping:
+            self.velocity = self.jump_power
+            self.is_jumping = True
+
+    def update(self):
+        # 物理重力
+        self.velocity += self.gravity
+        self.y += self.velocity
+
+        # 地面碰撞检测
+        ground_y = HEIGHT - 50
+        if self.y + self.height > ground_y:
+            self.y = ground_y - self.height
+            self.velocity = 0
+            self.is_jumping = False
+
+        # 更新拖尾粒子
+        self.trail.append([self.x, self.y + self.height // 2])
+        if len(self.trail) > 15: # 拖尾长度
+            self.trail.pop(0)
+
+    def draw(self, surface):
+        # 绘制拖尾
+        for i, pos in enumerate(self.trail):
+            alpha = int(255 * (i / len(self.trail)))
+            size = int(self.height * (i / len(self.trail)))
+            # 模拟发光拖尾
+            pygame.draw.circle(surface, NEON_BLUE, (int(pos[0]), int(pos[1])), size // 2)
+        
+        # 绘制玩家本体（带发光边框效果）
+        pygame.draw.rect(surface, NEON_BLUE, (self.x, self.y, self.width, self.height))
+        # 模拟辉光：在主体外面再画一圈半透明的
+        glow_rect = pygame.Rect(self.x - 2, self.y - 2, self.width + 4, self.height + 4)
+        pygame.draw.rect(surface, (0, 100, 100), glow_rect, 2)
+
+# 障碍物类
+class Obstacle:
+    def __init__(self):
+        self.width = random.randint(20, 40)
+        self.height = random.randint(40, 90)
+        self.x = WIDTH
+        self.y = HEIGHT - 50 - self.height
+        self.speed = 6
+        self.passed = False
+
+    def update(self):
+        self.x -= self.speed
+
+    def draw(self, surface):
+        pygame.draw.rect(surface, NEON_PINK, (self.x, self.y, self.width, self.height))
+        # 障碍物辉光
+        glow_rect = pygame.Rect(self.x - 2, self.y - 2, self.width + 4, self.height + 4)
+        pygame.draw.rect(surface, (100, 0, 100), glow_rect, 2)
+
+# 星空背景类
+class Star:
+    def __init__(self):
+        self.x = random.randint(0, WIDTH)
+        self.y = random.randint(0, HEIGHT - 50)
+        self.speed = random.uniform(0.5, 3)
+        self.size = random.randint(1, 2)
+
+    def update(self):
+        self.x -= self.speed
+        if self.x < 0:
+            self.x = WIDTH
+            self.y = random.randint(0, HEIGHT - 50)
+
+    def draw(self, surface):
+        pygame.draw.circle(surface, STAR_COLOR, (int(self.x), int(self.y)), self.size)
+
+# 实例化对象
+player = Player()
+obstacles = []
+stars = [Star() for _ in range(50)] # 生成50颗星星
+obstacle_timer = 0
+score = 0
+font = pygame.font.SysFont('Arial', 30, bold=True)
+game_over = False
+
+# --- 3. 主游戏循环 ---
+while True:
+    # 事件处理
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_SPACE:
+                if not game_over:
+                    player.jump()
+                else:
+                    # 游戏结束按空格重置
+                    player = Player()
+                    obstacles = []
+                    score = 0
+                    game_over = False
+                    obstacle_timer = 0
+
+    if not game_over:
+        # 更新背景星星
+        for star in stars:
+            star.update()
+
+        # 更新玩家
+        player.update()
+
+        # 生成障碍物
+        obstacle_timer += 1
+        if obstacle_timer > random.randint(60, 100): # 随机间隔生成
+            obstacles.append(Obstacle())
+            obstacle_timer = 0
+
+        # 更新障碍物与碰撞检测
+        for obs in obstacles[:]:
+            obs.update()
+            # 简单的矩形碰撞检测
+            if (player.x < obs.x + obs.width and
+                player.x + player.width > obs.x and
+                player.y < obs.y + obs.height and
+                player.y + player.height > obs.y):
+                game_over = True
+
+            # 计分
+            if not obs.passed and obs.x + obs.width < player.x:
+                score += 1
+                obs.passed = True
+
+            # 移除出屏幕的障碍物
+            if obs.x + obs.width < 0:
+                obstacles.remove(obs)
+
+    # --- 4. 画面渲染 ---
+    screen.fill(BG_COLOR)
+
+    # 绘制星星背景
+    for star in stars:
+        star.draw(screen)
+
+    # 绘制霓虹地面线
+    pygame.draw.line(screen, NEON_GREEN, (0, HEIGHT - 50), (WIDTH, HEIGHT - 50), 3)
+
+    # 绘制障碍物和玩家
+    for obs in obstacles:
+        obs.draw(screen)
+    player.draw(screen)
+
+    # 绘制分数
+    score_text = font.render(f"SCORE: {score}", True, NEON_GREEN)
+    screen.blit(score_text, (20, 20))
+
+    # 游戏结束提示
+    if game_over:
+        over_text = font.render("GAME OVER", True, NEON_PINK)
+        restart_text = font.render("Press SPACE to Restart", True, NEON_BLUE)
+        # 居中显示
+        screen.blit(over_text, (WIDTH // 2 - over_text.get_width() // 2, HEIGHT // 2 - 30))
+        screen.blit(restart_text, (WIDTH // 2 - restart_text.get_width() // 2, HEIGHT // 2 + 20))
+
+    pygame.display.flip()
+    clock.tick(FPS)
