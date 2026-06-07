@@ -1,7 +1,6 @@
 NeonHunter/
 │
-├── main.py             # 主程序入口 (提供模式选择菜单)
-├── game.py             # 游戏环境 (定义物理规则与奖励)
-├── trainer.py          # AI大脑 (Q-Learning算法核心)
-├── txt_mode.py         # 文本模式 (纯控制台训练)
-└── requirements.txt    # 依赖清单 (环境配置标准)
+├── main2.py             # 主程序入口 (提供模式选择菜单)
+├── game2.py             # 游戏环境 (定义物理规则与奖励)
+├── trainer2.py          # AI大脑 (Q-Learning算法核心)
+└── requirements2.txt    # 依赖清单 (环境配置标准)
